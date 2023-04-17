@@ -22,18 +22,42 @@ Angstrom = 1e-10  # 1 A in meters
 
 class BandStructure:
     def __init__(self,
-                 a, b, c,
                  energy_scale,
+                 a=None, b=None, c=None,
+                 Rmat=None,
                  band_params={"t": 1, "tp":-0.136, "tpp":0.068, "tz":0.07, "mu":-0.83},
                  band_name="band_1",
-                 epsilon_xy = "", epsilon_z = "", fudge_vF = "1",
+                 epsilon_xy = "", epsilon_z = "", epsilon = "", fudge_vF = "1",
                  res_xy=20, res_z=1,
+                 res=None,
                  **trash):
 
         self._energy_scale = energy_scale  # the value of "t" in meV
+
+        # OG
+        # Starting to introduce the R matrix defining the translational vectors.
+        # This is important for the generalization to any space group.
+        # Should probably get rid of a, b, c at some point.
         self.a = a  # in Angstrom
         self.b = b  # in Angstrom
         self.c = c  # in Angstrom
+        a, b, c = sp.Symbol('a'),  sp.Symbol('b'),  sp.Symbol('c')
+        self.Rmat = None
+        if Rmat is not None:
+            self.Rmat = sp.Matrix(Rmat)
+            print("Rmat used:")
+            print(self.Rmat)
+            self.Gmat = 2*pi*self.Rmat.inv()
+            print("Gmat:")
+            print(self.Gmat)
+            self.Gmat = self.Gmat.subs(a, self.a).subs(b, self.b).subs(c, self.c)
+            print(self.Gmat)
+        elif a is not None and b is not None and c is not None:
+            print("Using a, b, c instead of Rmat.")
+        else:
+            raise("The lattice parameters a, b and c are not all defined. "
+                  "Defined them all or use Rmat for more general structures.")
+
 
         ##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         try:
@@ -63,22 +87,27 @@ class BandStructure:
             self.var_sym.append(sp.Symbol(params))
         self.var_sym = tuple(self.var_sym)
 
-        ## Build the symbolic in-plane dispersion
+        # OG
+        # Generalizing epsilon to be 3D here. Let's see if necessary.
         self.epsilon_sym = None # intialize this attribute
-        if epsilon_xy=="":
-            self.epsilon_xy_sym = sp.sympify("- 2*t*(cos(a*kx) + cos(b*ky))" +\
-                                             "- 4*tp*cos(a*kx)*cos(b*ky)" +\
-                                             "- 2*tpp*(cos(2*a*kx) + cos(2*b*ky))")
+        if epsilon != "":
+            self.epsilon_sym = sp.sympify(epsilon)
         else:
-            epsilon_xy = epsilon_xy.replace("mu", "0") # replace is just to remove "mu" if the user has entered it by mistake
-            self.epsilon_xy_sym = sp.sympify(epsilon_xy)
+            ## Build the symbolic in-plane dispersion
+            if epsilon_xy=="":
+                self.epsilon_xy_sym = sp.sympify("- 2*t*(cos(a*kx) + cos(b*ky))" +\
+                                                 "- 4*tp*cos(a*kx)*cos(b*ky)" +\
+                                                 "- 2*tpp*(cos(2*a*kx) + cos(2*b*ky))")
+            else:
+                epsilon_xy = epsilon_xy.replace("mu", "0") # replace is just to remove "mu" if the user has entered it by mistake
+                self.epsilon_xy_sym = sp.sympify(epsilon_xy)
 
-        ## Build the symbolic out-of-plane dispersion
-        if epsilon_z=="":
-            self.epsilon_z_sym = sp.sympify("- 2*tz*(cos(a*kx) - cos(b*ky))**2*cos(a*kx/2)*cos(b*ky/2)*cos(c*kz/2)")
-        else:
-            epsilon_z = epsilon_z.replace("mu", "0") # replace is just to remove "mu" if the user has entered it by mistake
-            self.epsilon_z_sym = sp.sympify(epsilon_z)
+            ## Build the symbolic out-of-plane dispersion
+            if epsilon_z=="":
+                self.epsilon_z_sym = sp.sympify("- 2*tz*(cos(a*kx) - cos(b*ky))**2*cos(a*kx/2)*cos(b*ky/2)*cos(c*kz/2)")
+            else:
+                epsilon_z = epsilon_z.replace("mu", "0") # replace is just to remove "mu" if the user has entered it by mistake
+                self.epsilon_z_sym = sp.sympify(epsilon_z)
 
         ## Fudge factor on velocity
         self.fudge_vF = sp.sympify(fudge_vF)
@@ -88,10 +117,16 @@ class BandStructure:
 
         ## Discretization
         self.res_xy_rough = 501 # number of subdivisions of the FBZ in units of Pi in the plane for to run the Marching Square
-        self.res_xy       = res_xy  # number of subdivisions of the FBZ in units of Pi in the plane for the Fermi surface
-        if res_z % 2 == 0:  # make sure it is an odd number
-            res_z += 1
-        self.res_z = res_z  # number of subdivisions of the FBZ in units of Pi in the plane
+        # OG
+        # Also for generalization to a,b,c lattice parameters for general space groups.
+        if res is not None:
+            self.res = res
+        else:
+            self.res = None
+            self.res_xy       = res_xy  # number of subdivisions of the FBZ in units of Pi in the plane for the Fermi surface
+            if res_z % 2 == 0:  # make sure it is an odd number
+                res_z += 1
+            self.res_z = res_z  # number of subdivisions of the FBZ in units of Pi in the plane
         self.half_FS = True # if True, kz 0 -> 2pi, if False, kz -2pi to 2pi
 
         ## Fermi surface
@@ -172,7 +207,10 @@ class BandStructure:
         mu = sp.Symbol('mu')
 
         ## Dispersion 3D ////////////////////////////////////////////////////////
-        self.epsilon_sym = self.epsilon_xy_sym + self.epsilon_z_sym  - mu
+        if self.epsilon_sym is None:
+            self.epsilon_sym = self.epsilon_xy_sym + self.epsilon_z_sym  - mu
+        else:
+            self.epsilon_sym = self.epsilon_sym - mu
 
         ## Velocity /////////////////////////////////////////////////////////////
         self.v_sym = [sp.diff(self.epsilon_sym, kx) / self.fudge_vF,
@@ -183,6 +221,7 @@ class BandStructure:
         epsilon_func = sp.lambdify(self.var_sym, self.epsilon_sym, 'numpy')
         v_func = sp.lambdify(self.var_sym, self.v_sym, 'numpy')
 
+        print(epsilon_func)
         ## Numba ////////////////////////////////////////////////////////////////
         self.epsilon_func = jit(epsilon_func, nopython=True, parallel=True)
         self.v_func = jit(v_func, nopython=True, parallel=True)
@@ -255,30 +294,67 @@ class BandStructure:
         res_xy_rough: make denser rough meshgrid to interpolate after
         """
 
-        ## Initialize kx and ky arrays
-        if self.a == self.b: # tetragonal case
-            kx_a = np.linspace(0, pi / self.a, self.res_xy_rough)
-            ky_a = np.linspace(0, pi / self.b, self.res_xy_rough)
-        else: # orthorhombic
-            kx_a = np.linspace(-pi / self.a, pi / self.a, 2*self.res_xy_rough)
-            ky_a = np.linspace(-pi / self.b, pi / self.b, 2*self.res_xy_rough)
+        # OG
+        # Generalization to Rmat/Gmat
+        if self.Rmat is not None:
+            self.res_xy_rough = self.res[0]
+            if self.res is None:
+                raise("If using Rmat, should also use res.")
+            self.res_xy = self.res[0]
+            self.res_z = self.res[2]
 
+            k1_a = np.linspace(-0.5, 0.5, 2*self.res_xy_rough)
+            k2_a = np.linspace(-0.5, 0.5, 2*self.res_xy_rough)
+            k3_a = np.linspace(0, 1, self.res[2])
 
-        ## Initialize kz array
-        if self.half_FS==True:
-            kz_a = np.linspace(0, 2 * pi / self.c, self.res_z)
-            # half of FBZ, 2*pi/c because bodycentered unit cell
-            dkz = 2 * (2 * pi / self.c / self.res_z) # integrand along z, in A^-1
-            # factor 2 for dkz is because integratation is only over half kz,
-            # so the final integral needs to be multiplied by 2.
+            # kz still treated differently than in plane at this point
+            k11, k22 = np.meshgrid(k1_a, k2_a, indexing='ij')
+
+            G = np.array(self.Gmat.evalf()/2, dtype='float64') 
+
+            kxx = k11*2*G[0, 0] + k22*2*G[0, 1]
+            kyy = k11*2*G[1, 0] + k22*2*G[1, 1]
+
+            kz_a = k3_a*2*G[2, 2]
+            dkz = 2 * (2 * pi / self.c / self.res[2]) # integrand along z, in A^-1
+
+            self.BZ_k = [[G[0, 0], G[0, 0]+G[0, 1], G[0, 1], -G[0, 0]+G[0, 1], -G[0, 0],
+                          -G[0, 0]-G[0, 1], -G[0, 1], -G[0, 1]+G[0, 0], G[0, 0]],
+                         [G[1, 0], G[1, 0]+G[1, 1], G[1, 1], -G[1, 0]+G[1, 1], -G[1, 0],
+                          -G[1, 0]-G[1, 1], -G[1, 1], -G[1, 1]+G[1, 0], G[1, 0]]]
+
         else:
-            kz_a = np.linspace(-2 * pi / self.c, 2 * pi / self.c, self.res_z)
-            dkz = 4 * pi / self.c / self.res_z # integrand along z, in A^-1
 
-        kxx, kyy = np.meshgrid(kx_a, ky_a, indexing='ij')
+            ## Initialize kx and ky arrays
+            if self.a == self.b: # tetragonal case
+                kx_a = np.linspace(0, pi / self.a, self.res_xy_rough)
+                ky_a = np.linspace(0, pi / self.b, self.res_xy_rough)
+            else: # orthorhombic
+                kx_a = np.linspace(-pi / self.a, pi / self.a, 2*self.res_xy_rough)
+                ky_a = np.linspace(-pi / self.b, pi / self.b, 2*self.res_xy_rough)
+
+
+            ## Initialize kz array
+            if self.half_FS==True:
+                kz_a = np.linspace(0, 2 * pi / self.c, self.res_z)
+                # half of FBZ, 2*pi/c because bodycentered unit cell
+                dkz = 2 * (2 * pi / self.c / self.res_z) # integrand along z, in A^-1
+                # factor 2 for dkz is because integratation is only over half kz,
+                # so the final integral needs to be multiplied by 2.
+            else:
+                kz_a = np.linspace(-2 * pi / self.c, 2 * pi / self.c, self.res_Z)
+                dkz = 4 * pi / self.c / self.res_z # integrand along z, in A^-1
+
+            kxx, kyy = np.meshgrid(kx_a, ky_a, indexing='ij')
+
+            poa, pob = pi/self.a, pi/self.b
+            self.BZ_k = [[poa, poa, 0, -poa, -poa, -poa, 0, poa, poa],
+                         [0, pob, pob, pob, 0, -pob, -pob, -pob, 0]]
 
         ## Loop over the kz array
         for j, kz in enumerate(kz_a):
+            print(j, kz)
+            print(epsilon)
             contours = measure.find_contours(self.e_3D_func(kxx, kyy, kz), epsilon)
             number_of_points_per_kz = 0
 
@@ -287,12 +363,18 @@ class BandStructure:
 
                 # Contour come in units proportionnal to size of meshgrid
                 # one want to scale to units of kx and ky
-                if self.a == self.b:
-                    x = contour[:, 0] / (self.res_xy_rough - 1) * pi
-                    y = contour[:, 1] / (self.res_xy_rough - 1) * pi / (self.b / self.a)  # anisotropy
+                if self.Rmat is not None:
+                    G1 = (contour[:, 0] / (2*self.res_xy_rough - 1) - 0.5)
+                    G2 = (contour[:, 1] / (2*self.res_xy_rough - 1) - 0.5)
+                    x = 2*G[0, 0]*G1 + 2*G[0, 1]*G2
+                    y = 2*G[1, 0]*G1 + 2*G[1, 1]*G2
                 else:
-                    x = (contour[:, 0] / (2*self.res_xy_rough - 1) - 0.5) * 2*pi
-                    y = (contour[:, 1] / (2*self.res_xy_rough - 1) - 0.5) * 2*pi / (self.b / self.a) # anisotropy
+                    if self.a == self.b:
+                        x = contour[:, 0] / (self.res_xy_rough - 1) * pi
+                        y = contour[:, 1] / (self.res_xy_rough - 1) * pi / (self.b / self.a)  # anisotropy
+                    else:
+                        x = (contour[:, 0] / (2*self.res_xy_rough - 1) - 0.5) * 2*pi
+                        y = (contour[:, 1] / (2*self.res_xy_rough - 1) - 0.5) * 2*pi / (self.b / self.a) # anisotropy
 
                 ds = sqrt(np.diff(x)**2 + np.diff(y)**2)  # segment lengths
                 s = np.zeros_like(x)  # arrays of zeros
@@ -322,6 +404,8 @@ class BandStructure:
 
                 # Put in an array /////////////////////////////////////////////////////#
                 if i == 0 and j == 0:  # for first contour and first kz
+                    print("x_int")
+                    print(x_int)
                     kxf = x_int / self.a
                     kyf = y_int / self.a
                     # self.a (and not b) because anisotropy is taken into account earlier
@@ -345,6 +429,8 @@ class BandStructure:
 
         # dim -> (n, i0) = (xyz, position on FS)
         self.kf = np.vstack([kxf, kyf, kzf])
+        # Ginv = np.array(self.Gmat.inv().evalf(), dtype='float64')
+        # self.kf = np.einsum('ij,jk', Ginv, self.kf)
 
         # Compute Velocity at t = 0 on Fermi Surface
         vx, vy, vz = self.v_3D_func(self.kf[0, :], self.kf[1, :], self.kf[2, :])
@@ -422,8 +508,8 @@ class BandStructure:
                     self.vf[1,:self.number_of_points_per_kz_list[0]],
                     color = 'k')
 
-        axes.set_xlim(-pi, pi)
-        axes.set_ylim(-pi, pi)
+        #axes.set_xlim(-pi, pi)
+        #axes.set_ylim(-pi, pi)
         axes.tick_params(axis='x', which='major', pad=7)
         axes.tick_params(axis='y', which='major', pad=8)
         axes.set_xlabel(r"$k_{\rm x}$", labelpad = 8)
@@ -433,6 +519,9 @@ class BandStructure:
         axes.set_xticklabels([r"$-\pi$", "0", r"$\pi$"])
         axes.set_yticks([-pi, 0., pi])
         axes.set_yticklabels([r"$-\pi$", "0", r"$\pi$"])
+
+        print(self.BZ_k)
+        plt.plot(self.BZ_k[0], self.BZ_k[1], marker='o', color='black')
 
         plt.show()
         #//////////////////////////////////////////////////////////////////////#
@@ -698,3 +787,4 @@ class YRZBandStructure(BandStructure):
         ## Numba ////////////////////////////////////////////////////////////////
         self.epsilon_func = jit(epsilon_func, nopython=True, parallel=True)
         self.v_func = jit(v_func, nopython=True, parallel=True)
+
