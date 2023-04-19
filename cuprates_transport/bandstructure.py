@@ -472,7 +472,7 @@ class BandStructure:
     #///// RC Parameters //////#
     mpl.rcdefaults()
     mpl.rcParams['font.size'] = 24. # change the size of the font in every figure
-    mpl.rcParams['font.family'] = 'Arial' # font Arial in every figure
+    # mpl.rcParams['font.family'] = 'Arial' # font Arial in every figure
     mpl.rcParams['axes.labelsize'] = 24.
     mpl.rcParams['xtick.labelsize'] = 24
     mpl.rcParams['ytick.labelsize'] = 24
@@ -489,24 +489,53 @@ class BandStructure:
     def figDiscretizeFS2D(self, kz = 0, meshXY = 1001):
         """Show Discretized 2D Fermi Surface """
         mesh_graph = meshXY
-        kx = np.linspace(-pi / self.a, pi / self.a, mesh_graph)
-        ky = np.linspace(-pi / self.b, pi / self.b, mesh_graph)
-        kxx, kyy = np.meshgrid(kx, ky, indexing = 'ij')
 
-        fig, axes = plt.subplots(1, 1, figsize = (5.6, 5.6))
-        fig.subplots_adjust(left = 0.24, right = 0.87, bottom = 0.29, top = 0.91)
+        if self.Rmat is not None:
+            k1 = np.linspace(-0.5, 0.5, mesh_graph)
+            k2 = np.linspace(-0.5, 0.5, mesh_graph)
+            k11, k22 = np.meshgrid(k1, k2, indexing = 'ij')
 
-        fig.text(0.39,0.84, r"$k_{\rm z}$ = 0", ha = "right", fontsize = 16)
+            G = np.array(self.Gmat.evalf(), dtype='float64')
 
-        axes.contour(kxx*self.a, kyy*self.b, self.e_3D_func(kxx, kyy, 0), 0, colors = '#FF0000', linewidths = 3)
-        line = axes.plot(self.kf[0,:self.number_of_points_per_kz_list[0]] * self.a,
-                         self.kf[1,:self.number_of_points_per_kz_list[0]] * self.b)
-        plt.setp(line, ls ="", c = 'k', lw = 3, marker = "o", mfc = 'k', ms = 5, mec = "#7E2320", mew= 0)
-        axes.quiver(self.kf[0,:self.number_of_points_per_kz_list[0]] * self.a,
-                    self.kf[1,:self.number_of_points_per_kz_list[0]] * self.b,
-                    self.vf[0,:self.number_of_points_per_kz_list[0]],
-                    self.vf[1,:self.number_of_points_per_kz_list[0]],
-                    color = 'k')
+            kxx = k11*G[0, 0] + k22*G[0, 1]
+            kyy = k11*G[1, 0] + k22*G[1, 1]
+
+            ratiofig = np.amax(kxx) / np.amax(kyy)
+
+            fig, axes = plt.subplots(1, 1, figsize = (5.6*ratiofig, 5.6))
+            fig.subplots_adjust(left = 0.24, right = 0.87, bottom = 0.29, top = 0.91)
+
+            fig.text(0.39,0.84, r"$k_{\rm z}$ = 0", ha = "right", fontsize = 16)
+
+            axes.contour(kxx, kyy, self.e_3D_func(kxx, kyy, 0), 0, colors = '#FF0000', linewidths = 3)
+            line = axes.plot(self.kf[0,:self.number_of_points_per_kz_list[0]],
+                             self.kf[1,:self.number_of_points_per_kz_list[0]])
+            plt.setp(line, ls ="", c = 'k', lw = 3, marker = "o", mfc = 'k', ms = 5, mec = "#7E2320", mew= 0)
+            axes.quiver(self.kf[0,:self.number_of_points_per_kz_list[0]],
+                        self.kf[1,:self.number_of_points_per_kz_list[0]],
+                        self.vf[0,:self.number_of_points_per_kz_list[0]],
+                        self.vf[1,:self.number_of_points_per_kz_list[0]],
+                        color = 'k')
+
+        else:
+            kx = np.linspace(-pi / self.a, pi / self.a, mesh_graph)
+            ky = np.linspace(-pi / self.b, pi / self.b, mesh_graph)
+            kxx, kyy = np.meshgrid(kx, ky, indexing = 'ij')
+
+            fig, axes = plt.subplots(1, 1, figsize = (5.6, 5.6))
+            fig.subplots_adjust(left = 0.24, right = 0.87, bottom = 0.29, top = 0.91)
+
+            fig.text(0.39,0.84, r"$k_{\rm z}$ = 0", ha = "right", fontsize = 16)
+
+            axes.contour(kxx*self.a, kyy*self.b, self.e_3D_func(kxx, kyy, 0), 0, colors = '#FF0000', linewidths = 3)
+            line = axes.plot(self.kf[0,:self.number_of_points_per_kz_list[0]] * self.a,
+                             self.kf[1,:self.number_of_points_per_kz_list[0]] * self.b)
+            plt.setp(line, ls ="", c = 'k', lw = 3, marker = "o", mfc = 'k', ms = 5, mec = "#7E2320", mew= 0)
+            axes.quiver(self.kf[0,:self.number_of_points_per_kz_list[0]] * self.a,
+                        self.kf[1,:self.number_of_points_per_kz_list[0]] * self.b,
+                        self.vf[0,:self.number_of_points_per_kz_list[0]],
+                        self.vf[1,:self.number_of_points_per_kz_list[0]],
+                        color = 'k')
 
         #axes.set_xlim(-pi, pi)
         #axes.set_ylim(-pi, pi)
@@ -520,7 +549,6 @@ class BandStructure:
         axes.set_yticks([-pi, 0., pi])
         axes.set_yticklabels([r"$-\pi$", "0", r"$\pi$"])
 
-        print(self.BZ_k)
         plt.plot(self.BZ_k[0], self.BZ_k[1], marker='o', color='black')
 
         plt.show()
@@ -536,40 +564,94 @@ class BandStructure:
             ax.quiver(self.kf[0,:], self.kf[1,:], self.kf[2,:], self.vf[0,:], self.vf[1,:], self.vf[2,:], length=0.1, normalize=True)
         plt.show()
 
-    def figMultipleFS2D(self, meshXY = 1001, averaged_kz_FS = False):
+    def figMultipleFS2D(self, meshXY = 1001, averaged_kz_FS = False, nb_BZ = [1, 1]):
         """Show 2D Fermi Surface for different kz"""
         mesh_graph = meshXY
-        kx = np.linspace(-4*pi / self.a, 4*pi / self.a, mesh_graph)
-        ky = np.linspace(-4*pi / self.b, 4*pi / self.b, mesh_graph)
-        kxx, kyy = np.meshgrid(kx, ky, indexing = 'ij')
+        
+        if self.Rmat is not None:
+            k1 = np.linspace(-0.5*nb_BZ[0], 0.5*nb_BZ[0], mesh_graph)
+            k2 = np.linspace(-0.5*nb_BZ[1], 0.5*nb_BZ[1], mesh_graph)
+            k11, k22 = np.meshgrid(k1, k2, indexing = 'ij')
 
-        fig, axes = plt.subplots(1, 1, figsize=(8.5, 5.6))
-        fig.subplots_adjust(left=0.01, right=0.75, bottom=0.20, top=0.9)
+            G = np.array(self.Gmat.evalf(), dtype='float64')
 
-        doping_per_kz = self.dopingPerkz(resZ=5)[2:]
-        fig.text(0.63,0.84, r"$k_{\rm z}$ = 0,      $p$ $\in$ $k_{\rm z}$ = " + str(np.round(doping_per_kz[0], 3)), color = "#FF0000", fontsize = 18)
-        fig.text(0.63,0.78, r"$k_{\rm z}$ = $\pi/c$,   $p$ $\in$ $k_{\rm z}$ = " + str(np.round(doping_per_kz[1], 3)), color = "#00DC39", fontsize = 18)
-        fig.text(0.63,0.72, r"$k_{\rm z}$ = 2$\pi/c$, $p$ $\in$ $k_{\rm z}$ = " + str(np.round(doping_per_kz[2], 3)), color = "#6577FF", fontsize = 18)
+            kxx = k11*G[0, 0] + k22*G[0, 1]
+            kyy = k11*G[1, 0] + k22*G[1, 1]
 
-        fig.text(0.63,0.3, r"Average over $k_{\rm z}$", fontsize = 18)
-        fig.text(0.63,0.24, r"Total $p$ = " + str(np.round(self.doping(), 3)), fontsize = 18)
+            ratiofig = np.amax(kxx) / np.amax(kyy)
 
-        axes.contour(kxx*self.a, kyy*self.b, self.e_3D_func(kxx, kyy, 0), 0, colors = '#FF0000', linewidths = 3)
-        axes.contour(kxx*self.a, kyy*self.b, self.e_3D_func(kxx, kyy, pi/self.c), 0, colors = '#00DC39', linewidths = 3)
-        axes.contour(kxx*self.a, kyy*self.b, self.e_3D_func(kxx, kyy, 2*pi/self.c), 0, colors = '#6577FF', linewidths = 3)
+            fig, axes = plt.subplots(1, 1, figsize=(8.5*ratiofig, 5.6))
+            fig.subplots_adjust(left=0.01, right=0.75, bottom=0.20, top=0.9)
 
-        ## Averaged FS among all kz
-        if averaged_kz_FS == True:
-            kz_array = np.linspace(-2*pi/self.c, 2*pi/self.c, 5)
-            dump = 0
-            for kz in kz_array:
-                dump += self.e_3D_func(kxx, kyy, kz)
-            axes.contour(kxx*self.a, kyy*self.b, (1/self.res_z)*dump, 0, colors = '#000000', linewidths = 3, linestyles = "dashed")
+            doping_per_kz = self.dopingPerkz(resZ=5)[2:]
+            fig.text(0.63,0.84, r"$k_{\rm z}$ = 0,      $p$ $\in$ $k_{\rm z}$ = " + str(np.round(doping_per_kz[0], 3)), color = "#FF0000", fontsize = 18)
+            fig.text(0.63,0.78, r"$k_{\rm z}$ = $\pi/c$,   $p$ $\in$ $k_{\rm z}$ = " + str(np.round(doping_per_kz[1], 3)), color = "#00DC39", fontsize = 18)
+            fig.text(0.63,0.72, r"$k_{\rm z}$ = 2$\pi/c$, $p$ $\in$ $k_{\rm z}$ = " + str(np.round(doping_per_kz[2], 3)), color = "#6577FF", fontsize = 18)
 
+            fig.text(0.63,0.3, r"Average over $k_{\rm z}$", fontsize = 18)
+            fig.text(0.63,0.24, r"Total $p$ = " + str(np.round(self.doping(), 3)), fontsize = 18)
 
+            axes.contour(kxx, kyy, self.e_3D_func(kxx, kyy, 0), 0, colors = '#FF0000', linewidths = 3)
+            axes.contour(kxx, kyy, self.e_3D_func(kxx, kyy, pi/self.c), 0, colors = '#00DC39', linewidths = 3)
+            axes.contour(kxx, kyy, self.e_3D_func(kxx, kyy, 2*pi/self.c), 0, colors = '#6577FF', linewidths = 3)
 
-        axes.set_xlim(-pi, pi)
-        axes.set_ylim(-pi, pi)
+            ## Averaged FS among all kz
+            if averaged_kz_FS == True:
+                kz_array = np.linspace(-2*pi/self.c, 2*pi/self.c, 5)
+                dump = 0
+                for kz in kz_array:
+                    dump += self.e_3D_func(kxx, kyy, kz)
+                axes.contour(kxx, kyy, (1/self.res[2])*dump, 0, colors = '#000000', linewidths = 3, linestyles = "dashed")
+
+            # Show the Brillouin zone on the plot
+            G = G/2
+            BZ = [[G[0, 0], G[0, 0]+G[0, 1], G[0, 1], -G[0, 0]+G[0, 1], -G[0, 0],
+                   -G[0, 0]-G[0, 1], -G[0, 1], -G[0, 1]+G[0, 0], G[0, 0]],
+                  [G[1, 0], G[1, 0]+G[1, 1], G[1, 1], -G[1, 0]+G[1, 1], -G[1, 0],
+                   -G[1, 0]-G[1, 1], -G[1, 1], -G[1, 1]+G[1, 0], G[1, 0]]]
+
+            plt.plot(BZ[0], BZ[1], marker='o', color='black')
+
+            # If nb_BZ is non-trivial, show the extended BZ
+            if nb_BZ != [1, 1]:
+                G1 = [gi*nb_BZ[0] for gi in G[:, 0]]
+                G2 = [gi*nb_BZ[1] for gi in G[:, 1]]
+                G[:, 0], G[:, 1] = G1, G2
+                BZ2 = [[G[0, 0], G[0, 0]+G[0, 1], G[0, 1], -G[0, 0]+G[0, 1], -G[0, 0],
+                        -G[0, 0]-G[0, 1], -G[0, 1], -G[0, 1]+G[0, 0], G[0, 0]],
+                       [G[1, 0], G[1, 0]+G[1, 1], G[1, 1], -G[1, 0]+G[1, 1], -G[1, 0],
+                        -G[1, 0]-G[1, 1], -G[1, 1], -G[1, 1]+G[1, 0], G[1, 0]]]
+
+                plt.plot(BZ2[0], BZ2[1], color='black')
+
+        else:
+            kx = np.linspace(-4*pi / self.a, 4*pi / self.a, mesh_graph)
+            ky = np.linspace(-4*pi / self.b, 4*pi / self.b, mesh_graph)
+            kxx, kyy = np.meshgrid(kx, ky, indexing = 'ij')
+
+            fig, axes = plt.subplots(1, 1, figsize=(8.5, 5.6))
+            fig.subplots_adjust(left=0.01, right=0.75, bottom=0.20, top=0.9)
+
+            doping_per_kz = self.dopingPerkz(resZ=5)[2:]
+            fig.text(0.63,0.84, r"$k_{\rm z}$ = 0,      $p$ $\in$ $k_{\rm z}$ = " + str(np.round(doping_per_kz[0], 3)), color = "#FF0000", fontsize = 18)
+            fig.text(0.63,0.78, r"$k_{\rm z}$ = $\pi/c$,   $p$ $\in$ $k_{\rm z}$ = " + str(np.round(doping_per_kz[1], 3)), color = "#00DC39", fontsize = 18)
+            fig.text(0.63,0.72, r"$k_{\rm z}$ = 2$\pi/c$, $p$ $\in$ $k_{\rm z}$ = " + str(np.round(doping_per_kz[2], 3)), color = "#6577FF", fontsize = 18)
+
+            fig.text(0.63,0.3, r"Average over $k_{\rm z}$", fontsize = 18)
+            fig.text(0.63,0.24, r"Total $p$ = " + str(np.round(self.doping(), 3)), fontsize = 18)
+
+            axes.contour(kxx*self.a, kyy*self.b, self.e_3D_func(kxx, kyy, 0), 0, colors = '#FF0000', linewidths = 3)
+            axes.contour(kxx*self.a, kyy*self.b, self.e_3D_func(kxx, kyy, pi/self.c), 0, colors = '#00DC39', linewidths = 3)
+            axes.contour(kxx*self.a, kyy*self.b, self.e_3D_func(kxx, kyy, 2*pi/self.c), 0, colors = '#6577FF', linewidths = 3)
+
+            ## Averaged FS among all kz
+            if averaged_kz_FS == True:
+                kz_array = np.linspace(-2*pi/self.c, 2*pi/self.c, 5)
+                dump = 0
+                for kz in kz_array:
+                    dump += self.e_3D_func(kxx, kyy, kz)
+                axes.contour(kxx*self.a, kyy*self.b, (1/self.res_z)*dump, 0, colors = '#000000', linewidths = 3, linestyles = "dashed")
+
         axes.tick_params(axis='x', which='major', pad=7)
         axes.tick_params(axis='y', which='major', pad=8)
         axes.set_xlabel(r"$k_{\rm x}$", labelpad = 8)
@@ -581,6 +663,7 @@ class BandStructure:
         axes.set_yticklabels([r"$-\pi$", "0", r"$\pi$"])
         axes.set_aspect(aspect=1)
 
+        plt.tight_layout()
         plt.show()
         #//////////////////////////////////////////////////////////////////////////////#
 
