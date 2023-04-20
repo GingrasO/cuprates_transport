@@ -748,7 +748,7 @@ class Conductivity:
 
     #---------------------------------------------------------------------------
 
-    def figParameters(self, fig_show=True):
+    def figParameters(self, fig_show=True, bandFormulaE2D = None, bandFormulaEz = None):
 
         # (1,1) means one plot, and figsize is w x h in inch of figure
         fig, axes = plt.subplots(1, 1, figsize=(10.5, 5.8))
@@ -773,15 +773,17 @@ class Conductivity:
                             r"$c$ = " + "{0:.2f}".format(self.bandObject.c) + r" $\AA$", fontsize=12)
 
         # r"$c$ " + "{0:.2f}".format(self.bandObject.c)
-        bandFormulaE2D = r"$\epsilon_{\rm k}^{\rm 2D}$ = - $\mu$" +\
-            r" - 2$t$ (cos($k_{\rm x}a$) + cos($k_{\rm y}b$))" +\
-            r" - 4$t^{'}$ (cos($k_{\rm x}a$) cos($k_{\rm y}b$))" + "\n" +\
-            r"          - 2$t^{''}$ (cos(2$k_{\rm x}a$) + cos(2$k_{\rm y}b$))" + "\n"
+        if bandFormulaE2D is None:
+            bandFormulaE2D = r"$\epsilon_{\rm k}^{\rm 2D}$ = - $\mu$" +\
+                r" - 2$t$ (cos($k_{\rm x}a$) + cos($k_{\rm y}b$))" +\
+                r" - 4$t^{'}$ (cos($k_{\rm x}a$) cos($k_{\rm y}b$))" + "\n" +\
+                r"          - 2$t^{''}$ (cos(2$k_{\rm x}a$) + cos(2$k_{\rm y}b$))" + "\n"
         fig.text(0.45, 0.27, bandFormulaE2D, fontsize=10)
 
-        bandFormulaEz = r"$\epsilon_{\rm k}^{\rm z}$   =" +\
-            r" - 2$t_{\rm z}$ cos($k_{\rm z}c/2$) cos($k_{\rm x}a/2$) cos($k_{\rm y}b/2$) (cos($k_{\rm x}a$) - cos($k_{\rm y}b$))$^2$" + "\n" +\
-            r"          - 2$t_{\rm z}^{'}$ cos($k_{\rm z}c/2$)"
+        if bandFormulaEz is None:
+            bandFormulaEz = r"$\epsilon_{\rm k}^{\rm z}$   =" +\
+                r" - 2$t_{\rm z}$ cos($k_{\rm z}c/2$) cos($k_{\rm x}a/2$) cos($k_{\rm y}b/2$) (cos($k_{\rm x}a$) - cos($k_{\rm y}b$))$^2$" + "\n" +\
+                r"          - 2$t_{\rm z}^{'}$ cos($k_{\rm z}c/2$)"
         fig.text(0.45, 0.21, bandFormulaEz, fontsize=10)
 
 
@@ -850,78 +852,160 @@ class Conductivity:
             h_label -= 0.035
 
         ## Inset FS ///////////////////////////////////////////////////////////#
-        a = self.bandObject.a
-        b = self.bandObject.b
-        c = self.bandObject.c
 
-        mesh_graph = 201
-        kx = np.linspace(-pi/a, pi/a, mesh_graph)
-        ky = np.linspace(-pi/b, pi/b, mesh_graph)
-        kxx, kyy = np.meshgrid(kx, ky, indexing='ij')
+        if self.bandObject.Rmat is not None:
+            a = self.bandObject.a
+            b = self.bandObject.b
+            c = self.bandObject.c
 
-        axes_FS = plt.axes([-0.02, 0.56, .4, .4])
-        axes_FS.set_aspect(aspect=1)
-        axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
-            kxx, kyy, 0), 0, colors='#FF0000', linewidths=1)
-        axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
-            kxx, kyy, pi / c), 0, colors='#00DC39', linewidths=1)
-        axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
-            kxx, kyy, 2 * pi / c), 0, colors='#6577FF', linewidths=1)
-        fig.text(0.30, 0.67, r"$k_{\rm z}$", fontsize=14)
-        fig.text(0.30, 0.63, r"0", color='#FF0000', fontsize=14)
-        fig.text(0.30, 0.60, r"$\pi$/c", color='#00DC39', fontsize=14)
-        fig.text(0.30, 0.57, r"$2\pi$/c", color='#6577FF', fontsize=14)
+            mesh_graph = 201
+            k1 = np.linspace(-0.5, 0.5, mesh_graph)
+            k2 = np.linspace(-0.5, 0.5, mesh_graph)
+            k11, k22 = np.meshgrid(k1, k2, indexing='ij')
 
-        axes_FS.set_xlabel(r"$k_{\rm x}$", labelpad=0, fontsize=14)
-        axes_FS.set_ylabel(r"$k_{\rm y}$", labelpad=-5, fontsize=14)
+            G = np.array(self.bandObject.Gmat.evalf(), dtype='float64')
+            kxx = k11*G[0, 0] + k22*G[0, 1]
+            kyy = k11*G[1, 0] + k22*G[1, 1]
 
-        axes_FS.set_xticks([-pi/a, 0., pi/a])
-        axes_FS.set_xticklabels([r"$-\pi$", "0", r"$\pi$"], fontsize=14)
-        axes_FS.set_yticks([-pi/b, 0., pi/b])
-        axes_FS.set_yticklabels([r"$-\pi$", "0", r"$\pi$"], fontsize=14)
-        # axes_FS.tick_params(axis='x', which='major', pad=7)
-        # axes_FS.tick_params(axis='y', which='major', pad=8)
+            ratiofig = np.amax(kxx)/np.amax(kyy)
 
-        ## Inset Scattering rate ////////////////////////////////////////////////#
-        axes_srate = plt.axes([-0.02, 0.04, .4, .4])
-        axes_srate.set_aspect(aspect=1)
+            axes_FS = plt.axes([-0.02, 0.56, .4*ratiofig, .4])
+            axes_FS.set_aspect(aspect=1)
+            axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
+                kxx, kyy, 0), 0, colors='#FF0000', linewidths=1)
+            axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
+                kxx, kyy, pi / c), 0, colors='#00DC39', linewidths=1)
+            axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
+                kxx, kyy, 2 * pi / c), 0, colors='#6577FF', linewidths=1)
+            fig.text(0.30, 0.67, r"$k_{\rm z}$", fontsize=14)
+            fig.text(0.30, 0.63, r"0", color='#FF0000', fontsize=14)
+            fig.text(0.30, 0.60, r"$\pi$/c", color='#00DC39', fontsize=14)
+            fig.text(0.30, 0.57, r"$2\pi$/c", color='#6577FF', fontsize=14)
 
-        mesh_xy = 501
-        kx_a = np.linspace(-pi / self.bandObject.a, pi / self.bandObject.a,
+            axes_FS.set_xlabel(r"$k_{\rm x}$", labelpad=0, fontsize=14)
+            axes_FS.set_ylabel(r"$k_{\rm y}$", labelpad=-5, fontsize=14)
+
+            axes_FS.set_xticks([-pi/a, 0., pi/a])
+            axes_FS.set_xticklabels([r"$-\pi/a$", "0", r"$\pi/a$"], fontsize=14)
+            axes_FS.set_yticks([-pi/b, 0., pi/b])
+            axes_FS.set_yticklabels([r"$-\pi/b$", "0", r"$\pi/b$"], fontsize=14)
+            # axes_FS.tick_params(axis='x', which='major', pad=7)
+            # axes_FS.tick_params(axis='y', which='major', pad=8)
+
+            ## Inset Scattering rate ////////////////////////////////////////////////#
+            axes_srate = plt.axes([-0.02, 0.04, ratiofig, .4])
+            axes_srate.set_aspect(aspect=1)
+
+            mesh_xy = 501
+            k1_a = np.linspace(-0.5, 0.5, mesh_xy)
+            k2_a = np.linspace(-0.5, 0.5, mesh_xy)
+            k11, k22 = np.meshgrid(k1_a, k2_a, indexing='ij')
+
+            kxx = k11*G[0, 0] + k22*G[0, 1]
+            kyy = k11*G[1, 0] + k22*G[1, 1]
+
+            bands = self.bandObject.e_3D_func(kxx, kyy, 0)
+            contours = measure.find_contours(bands, 0)
+
+            gamma_max_list = []
+            gamma_min_list = []
+
+            for contour in contours:
+                # Contour come in units proportionnal to size of meshgrid
+                # one want to scale to units of kx and ky
+                G1 = (contour[:, 0] / (mesh_xy - 1) - 0.5)
+                G2 = (contour[:, 1] / (mesh_xy - 1) - 0.5)
+                kx = G[0, 0]*G1 + G[0, 1]*G2
+                ky = G[1, 0]*G1 + G[1, 1]*G2
+                vx, vy, vz = self.bandObject.v_3D_func(kx, ky, np.zeros_like(kx))
+
+                gamma_kz0 = 1 / self.tau_total_func(kx, ky, 0, vx, vy, vz)
+                gamma_max_list.append(np.max(gamma_kz0))
+                gamma_min_list.append(np.min(gamma_kz0))
+
+                points = np.array([kx * self.bandObject.a,
+                                   ky * self.bandObject.b]).T.reshape(-1, 1, 2)
+                segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+                lc = LineCollection(segments, cmap=plt.get_cmap('gnuplot'))
+                lc.set_array(gamma_kz0)
+                lc.set_linewidth(4)
+
+                line = axes_srate.add_collection(lc)
+
+        else:
+            a = self.bandObject.a
+            b = self.bandObject.b
+            c = self.bandObject.c
+
+            mesh_graph = 201
+            kx = np.linspace(-pi/a, pi/a, mesh_graph)
+            ky = np.linspace(-pi/b, pi/b, mesh_graph)
+            kxx, kyy = np.meshgrid(kx, ky, indexing='ij')
+
+            axes_FS = plt.axes([-0.02, 0.56, .4, .4])
+            axes_FS.set_aspect(aspect=1)
+            axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
+                kxx, kyy, 0), 0, colors='#FF0000', linewidths=1)
+            axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
+                kxx, kyy, pi / c), 0, colors='#00DC39', linewidths=1)
+            axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
+                kxx, kyy, 2 * pi / c), 0, colors='#6577FF', linewidths=1)
+            fig.text(0.30, 0.67, r"$k_{\rm z}$", fontsize=14)
+            fig.text(0.30, 0.63, r"0", color='#FF0000', fontsize=14)
+            fig.text(0.30, 0.60, r"$\pi$/c", color='#00DC39', fontsize=14)
+            fig.text(0.30, 0.57, r"$2\pi$/c", color='#6577FF', fontsize=14)
+
+            axes_FS.set_xlabel(r"$k_{\rm x}$", labelpad=0, fontsize=14)
+            axes_FS.set_ylabel(r"$k_{\rm y}$", labelpad=-5, fontsize=14)
+
+            axes_FS.set_xticks([-pi/a, 0., pi/a])
+            axes_FS.set_xticklabels([r"$-\pi$", "0", r"$\pi$"], fontsize=14)
+            axes_FS.set_yticks([-pi/b, 0., pi/b])
+            axes_FS.set_yticklabels([r"$-\pi$", "0", r"$\pi$"], fontsize=14)
+            # axes_FS.tick_params(axis='x', which='major', pad=7)
+            # axes_FS.tick_params(axis='y', which='major', pad=8)
+
+            ## Inset Scattering rate ////////////////////////////////////////////////#
+            axes_srate = plt.axes([-0.02, 0.04, .4, .4])
+            axes_srate.set_aspect(aspect=1)
+
+            mesh_xy = 501
+            kx_a = np.linspace(-pi / self.bandObject.a, pi / self.bandObject.a,
+                               mesh_xy)
+            ky_a = np.linspace(-pi / self.bandObject.b, pi / self.bandObject.b,
                            mesh_xy)
-        ky_a = np.linspace(-pi / self.bandObject.b, pi / self.bandObject.b,
-                           mesh_xy)
 
-        kxx, kyy = np.meshgrid(kx_a, ky_a, indexing='ij')
+            kxx, kyy = np.meshgrid(kx_a, ky_a, indexing='ij')
 
-        bands = self.bandObject.e_3D_func(kxx, kyy, 0)
-        contours = measure.find_contours(bands, 0)
+            bands = self.bandObject.e_3D_func(kxx, kyy, 0)
+            contours = measure.find_contours(bands, 0)
 
-        gamma_max_list = []
-        gamma_min_list = []
-        for contour in contours:
+            gamma_max_list = []
+            gamma_min_list = []
+            for contour in contours:
 
-            # Contour come in units proportionnal to size of meshgrid
-            # one want to scale to units of kx and ky
-            kx = (contour[:, 0] /
-                  (mesh_xy - 1) - 0.5) * 2 * pi / self.bandObject.a
-            ky = (contour[:, 1] /
-                  (mesh_xy - 1) - 0.5) * 2 * pi / self.bandObject.b
-            vx, vy, vz = self.bandObject.v_3D_func(kx, ky, np.zeros_like(kx))
+                # Contour come in units proportionnal to size of meshgrid
+                # one want to scale to units of kx and ky
+                kx = (contour[:, 0] /
+                      (mesh_xy - 1) - 0.5) * 2 * pi / self.bandObject.a
+                ky = (contour[:, 1] /
+                      (mesh_xy - 1) - 0.5) * 2 * pi / self.bandObject.b
+                vx, vy, vz = self.bandObject.v_3D_func(kx, ky, np.zeros_like(kx))
 
-            gamma_kz0 = 1 / self.tau_total_func(kx, ky, 0, vx, vy, vz)
-            gamma_max_list.append(np.max(gamma_kz0))
-            gamma_min_list.append(np.min(gamma_kz0))
+                gamma_kz0 = 1 / self.tau_total_func(kx, ky, 0, vx, vy, vz)
+                gamma_max_list.append(np.max(gamma_kz0))
+                gamma_min_list.append(np.min(gamma_kz0))
 
-            points = np.array([kx * self.bandObject.a,
-                               ky * self.bandObject.b]).T.reshape(-1, 1, 2)
-            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                points = np.array([kx * self.bandObject.a,
+                                   ky * self.bandObject.b]).T.reshape(-1, 1, 2)
+                segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
-            lc = LineCollection(segments, cmap=plt.get_cmap('gnuplot'))
-            lc.set_array(gamma_kz0)
-            lc.set_linewidth(4)
+                lc = LineCollection(segments, cmap=plt.get_cmap('gnuplot'))
+                lc.set_array(gamma_kz0)
+                lc.set_linewidth(4)
 
-            line = axes_srate.add_collection(lc)
+                line = axes_srate.add_collection(lc)
 
         gamma_max = max(gamma_max_list)
         gamma_min = min(gamma_min_list)
@@ -944,6 +1028,8 @@ class Conductivity:
         axes_srate.set_xticklabels([r"$-\pi$", "0", r"$\pi$"], fontsize=14)
         axes_srate.set_yticks([-pi, 0., pi])
         axes_srate.set_yticklabels([r"$-\pi$", "0", r"$\pi$"], fontsize=14)
+
+        plt.tight_layout()
 
         ## Show figure ////////////////////////////////////////////////////////#
         if fig_show == True:
