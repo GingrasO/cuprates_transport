@@ -869,7 +869,7 @@ class Conductivity:
 
             ratiofig = np.amax(kxx)/np.amax(kyy)
 
-            axes_FS = plt.axes([-0.02, 0.56, .4*ratiofig, .4])
+            axes_FS = plt.axes([-0.02, 0.56, .4, .4])
             axes_FS.set_aspect(aspect=1)
             axes_FS.contour(kxx, kyy, self.bandObject.e_3D_func(
                 kxx, kyy, 0), 0, colors='#FF0000', linewidths=1)
@@ -885,6 +885,8 @@ class Conductivity:
             axes_FS.set_xlabel(r"$k_{\rm x}$", labelpad=0, fontsize=14)
             axes_FS.set_ylabel(r"$k_{\rm y}$", labelpad=-5, fontsize=14)
 
+            axes_FS.set_xlim([-pi/a, pi/a])
+            axes_FS.set_ylim([-pi/b, pi/b])
             axes_FS.set_xticks([-pi/a, 0., pi/a])
             axes_FS.set_xticklabels([r"$-\pi/a$", "0", r"$\pi/a$"], fontsize=14)
             axes_FS.set_yticks([-pi/b, 0., pi/b])
@@ -893,7 +895,7 @@ class Conductivity:
             # axes_FS.tick_params(axis='y', which='major', pad=8)
 
             ## Inset Scattering rate ////////////////////////////////////////////////#
-            axes_srate = plt.axes([-0.02, 0.04, ratiofig, .4])
+            axes_srate = plt.axes([-0.02, 0.04, .4, .4])
             axes_srate.set_aspect(aspect=1)
 
             mesh_xy = 501
@@ -1029,7 +1031,7 @@ class Conductivity:
         axes_srate.set_yticks([-pi, 0., pi])
         axes_srate.set_yticklabels([r"$-\pi$", "0", r"$\pi$"], fontsize=14)
 
-        plt.tight_layout()
+        # plt.tight_layout()
 
         ## Show figure ////////////////////////////////////////////////////////#
         if fig_show == True:
