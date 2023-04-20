@@ -427,7 +427,7 @@ class BandStructure:
                     self.dkz = np.append(self.dkz, dkz * np.ones_like(x_int))
                     self.dkf = np.append(self.dkf, dks * dkz * np.ones_like(x_int))
 
-            if self.a == self.b:
+            if self.Rmat is None and self.a == self.b:
                 # discretize one fourth of FS, therefore need * 4
                 self.number_of_points_per_kz_list.append(4 * number_of_points_per_kz)
             else:
