@@ -297,7 +297,6 @@ class BandStructure:
         # OG
         # Generalization to Rmat/Gmat
         if self.Rmat is not None:
-            self.res_xy_rough = self.res[0]
             if self.res is None:
                 raise("If using Rmat, should also use res.")
             self.res_xy = self.res[0]
@@ -310,21 +309,21 @@ class BandStructure:
             # kz still treated differently than in plane at this point
             k11, k22 = np.meshgrid(k1_a, k2_a, indexing='ij')
 
-            G = np.array(self.Gmat.evalf()/2, dtype='float64') 
+            G = np.array(self.Gmat.evalf(), dtype='float64') 
+            Go2 = G/2
 
-            kxx = k11*2*G[0, 0] + k22*2*G[0, 1]
-            kyy = k11*2*G[1, 0] + k22*2*G[1, 1]
+            kxx = k11*G[0, 0] + k22*G[0, 1]
+            kyy = k11*G[1, 0] + k22*G[1, 1]
 
-            kz_a = k3_a*2*G[2, 2]
+            kz_a = k3_a*G[2, 2]
             dkz = 2 * (2 * pi / self.c / self.res[2]) # integrand along z, in A^-1
 
-            self.BZ_k = [[G[0, 0], G[0, 0]+G[0, 1], G[0, 1], -G[0, 0]+G[0, 1], -G[0, 0],
-                          -G[0, 0]-G[0, 1], -G[0, 1], -G[0, 1]+G[0, 0], G[0, 0]],
-                         [G[1, 0], G[1, 0]+G[1, 1], G[1, 1], -G[1, 0]+G[1, 1], -G[1, 0],
-                          -G[1, 0]-G[1, 1], -G[1, 1], -G[1, 1]+G[1, 0], G[1, 0]]]
+            self.BZ_k = [[Go2[0, 0], Go2[0, 0]+Go2[0, 1], Go2[0, 1], -Go2[0, 0]+Go2[0, 1], -Go2[0, 0],
+                          -Go2[0, 0]-Go2[0, 1], -Go2[0, 1], -Go2[0, 1]+Go2[0, 0], Go2[0, 0]],
+                         [Go2[1, 0], Go2[1, 0]+Go2[1, 1], Go2[1, 1], -Go2[1, 0]+Go2[1, 1], -Go2[1, 0],
+                          -Go2[1, 0]-Go2[1, 1], -Go2[1, 1], -Go2[1, 1]+Go2[1, 0], Go2[1, 0]]]
 
         else:
-
             ## Initialize kx and ky arrays
             if self.a == self.b: # tetragonal case
                 kx_a = np.linspace(0, pi / self.a, self.res_xy_rough)
@@ -366,8 +365,8 @@ class BandStructure:
                 if self.Rmat is not None:
                     G1 = (contour[:, 0] / (2*self.res_xy_rough - 1) - 0.5)
                     G2 = (contour[:, 1] / (2*self.res_xy_rough - 1) - 0.5)
-                    x = 2*G[0, 0]*G1 + 2*G[0, 1]*G2
-                    y = 2*G[1, 0]*G1 + 2*G[1, 1]*G2
+                    x = G[0, 0]*G1 + G[0, 1]*G2
+                    y = G[1, 0]*G1 + G[1, 1]*G2
                 else:
                     if self.a == self.b:
                         x = contour[:, 0] / (self.res_xy_rough - 1) * pi
@@ -391,31 +390,38 @@ class BandStructure:
                 x_int = np.interp(s_int, s, x)[:-1]
                 y_int = np.interp(s_int, s, y)[:-1]
 
-                if self.a == self.b:
-                    # For tetragonal symmetry, rotate the contour to get the entire Fermi surface
-                    x_dump = x_int
-                    y_dump = y_int
-                    for angle in [pi / 2, pi, 3 * pi / 2]:
-                        x_int_p, y_int_p = self.rotation(x_int, y_int, angle)
-                        x_dump = np.append(x_dump, x_int_p)
-                        y_dump = np.append(y_dump, y_int_p)
-                    x_int = x_dump
-                    y_int = y_dump
+                if self.Rmat is None:
+                    if self.a == self.b:
+                        # For tetragonal symmetry, rotate the contour to get the entire Fermi surface
+                        x_dump = x_int
+                        y_dump = y_int
+                        for angle in [pi / 2, pi, 3 * pi / 2]:
+                            x_int_p, y_int_p = self.rotation(x_int, y_int, angle)
+                            x_dump = np.append(x_dump, x_int_p)
+                            y_dump = np.append(y_dump, y_int_p)
+                        x_int = x_dump
+                        y_int = y_dump
 
                 # Put in an array /////////////////////////////////////////////////////#
                 if i == 0 and j == 0:  # for first contour and first kz
-                    print("x_int")
-                    print(x_int)
-                    kxf = x_int / self.a
-                    kyf = y_int / self.a
+                    if self.Rmat is not None:
+                        kxf = x_int
+                        kyf = y_int
+                    else:
+                        kxf = x_int / self.a
+                        kyf = y_int / self.a
                     # self.a (and not b) because anisotropy is taken into account earlier
                     kzf = kz * np.ones_like(x_int)
                     self.dks = dks * np.ones_like(x_int)
                     self.dkz = dkz * np.ones_like(x_int)
                     self.dkf = dks * dkz * np.ones_like(x_int)
                 else:
-                    kxf = np.append(kxf, x_int / self.a)
-                    kyf = np.append(kyf, y_int / self.a)
+                    if self.Rmat is not None:
+                        kxf = np.append(kxf, x_int)
+                        kyf = np.append(kyf, y_int)
+                    else:
+                        kxf = np.append(kxf, x_int / self.a)
+                        kyf = np.append(kyf, y_int / self.a)
                     kzf = np.append(kzf, kz * np.ones_like(x_int))
                     self.dks = np.append(self.dks, dks * np.ones_like(x_int))
                     self.dkz = np.append(self.dkz, dkz * np.ones_like(x_int))
@@ -429,8 +435,6 @@ class BandStructure:
 
         # dim -> (n, i0) = (xyz, position on FS)
         self.kf = np.vstack([kxf, kyf, kzf])
-        # Ginv = np.array(self.Gmat.inv().evalf(), dtype='float64')
-        # self.kf = np.einsum('ij,jk', Ginv, self.kf)
 
         # Compute Velocity at t = 0 on Fermi Surface
         vx, vy, vz = self.v_3D_func(self.kf[0, :], self.kf[1, :], self.kf[2, :])
@@ -544,10 +548,10 @@ class BandStructure:
         axes.set_xlabel(r"$k_{\rm x}$", labelpad = 8)
         axes.set_ylabel(r"$k_{\rm y}$", labelpad = 8)
 
-        axes.set_xticks([-pi, 0., pi])
-        axes.set_xticklabels([r"$-\pi$", "0", r"$\pi$"])
-        axes.set_yticks([-pi, 0., pi])
-        axes.set_yticklabels([r"$-\pi$", "0", r"$\pi$"])
+        axes.set_xticks([-pi/self.a, 0., pi/self.a])
+        axes.set_xticklabels([r"$-\pi/a$", "0", r"$\pi/a$"])
+        axes.set_yticks([-pi/self.b, 0., pi/self.b])
+        axes.set_yticklabels([r"$-\pi/b$", "0", r"$\pi/b$"])
 
         plt.plot(self.BZ_k[0], self.BZ_k[1], marker='o', color='black')
 
