@@ -180,7 +180,7 @@ class ADMR:
         header = DataHeader, comments = "#")
 
 
-    def figADMR(self, fig_show=True, fig_save=True, folder="", filename=None):
+    def figADMR(self, fig_show=True, fig_save=True, folder="", filename=None, bandFormulaE2D=None, bandFormulaEz=None):
         #///// RC Parameters //////#
         mpl.rcdefaults()
         mpl.rcParams['font.size'] = 24. # change the size of the font in every figure
@@ -261,7 +261,7 @@ class ADMR:
 
         ## Parameters figures ///////////////////////////////////////////////////#
         for iniCondObject in self.initialCondObjectDict.values():
-            fig_list.append(iniCondObject.figParameters(fig_show=fig_show))
+            fig_list.append(iniCondObject.figParameters(fig_show=fig_show, bandFormulaE2D=bandFormulaE2D, bandFormulaEz=bandFormulaEz))
 
         ## Save figure ////////////////////////////////////////////////////////#
         if fig_save == True:
